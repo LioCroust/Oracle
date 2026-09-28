@@ -1,5 +1,7 @@
+import * as Application from 'expo-application';
 import * as SecureStore from 'expo-secure-store';
 import * as FileSystem from 'expo-file-system/legacy';
+import { Platform } from 'react-native';
 
 const DEVICE_ID_KEY = 'oracle_device_id';
 const DEVICE_ID_BACKUP_FILE = 'oracle_device_id.json';
@@ -55,10 +57,25 @@ async function deleteBackup(): Promise<void> {
 export async function getOrCreateDeviceId(): Promise<string> {
   let deviceId: string | null = null;
 
-  try {
-    deviceId = await SecureStore.getItemAsync(DEVICE_ID_KEY);
-  } catch {
-    // SecureStore may fail on some platforms; fall through to backup.
+  // Android ID survives app-data removal and reinstall for the same app
+  // signing identity and Android user, unlike values stored in the app sandbox.
+  if (Platform.OS === 'android') {
+    try {
+      const androidId = Application.getAndroidId();
+      if (androidId) {
+        deviceId = `android_${androidId}`;
+      }
+    } catch {
+      // Fall back to the locally persisted ID if the platform ID is unavailable.
+    }
+  }
+
+  if (!deviceId) {
+    try {
+      deviceId = await SecureStore.getItemAsync(DEVICE_ID_KEY);
+    } catch {
+      // SecureStore may fail on some platforms; fall through to backup.
+    }
   }
 
   if (!deviceId) {

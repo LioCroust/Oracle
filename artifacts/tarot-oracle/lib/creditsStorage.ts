@@ -48,6 +48,7 @@ export interface CreditWallet {
 interface CreditsData {
   wallet: CreditWallet;
   transactions: CreditTransaction[];
+  welcomeBonusClaimSynced?: boolean;
 }
 
 const STORAGE_KEY = '@oracle/creditsData';
@@ -55,6 +56,9 @@ const BACKUP_FILE = 'oracle_credits_data.json';
 const MAX_TRANSACTIONS = 500;
 const INITIAL_BONUS = 150;
 export const MAX_BALANCE = 2000;
+const WELCOME_BONUS_SYNC_RETRY_MS = 30_000;
+let lastWelcomeBonusSyncAttemptAt = 0;
+let creditsDataLoadPromise: Promise<CreditsData> | null = null;
 const PACKS: Record<
   string,
   { credits: number; amount: number; label: string; type: CreditTransactionType }
@@ -143,25 +147,10 @@ function createWalletData(bonusAmount: number): CreditsData {
       description: 'Bonus de bienvenue de 150 crédits',
     });
   }
-  return { wallet, transactions };
+  return { wallet, transactions, welcomeBonusClaimSynced: false };
 }
 
-async function determineInitialBonus(): Promise<number> {
-  try {
-    const deviceId = await getOrCreateDeviceId();
-    const { newlyGranted } = await claimCreditsBonus({ deviceId });
-    // Le serveur gère l'atomicité : on crédite uniquement si le bonus vient d'être accordé.
-    return newlyGranted ? INITIAL_BONUS : 0;
-  } catch (err) {
-    // Si le serveur est injoignable, on ne crédite pas le bonus localement pour éviter
-    // un double-attribution en cas de réinstallation. Le solde démarrera à 0 et
-    // l'attribution se fera lors d'une prochaine connexion.
-    console.warn('Bonus claim failed; starting with 0 credits until server is reachable', err);
-    return 0;
-  }
-}
-
-export async function getCreditsData(): Promise<CreditsData> {
+async function readStoredCreditsData(): Promise<CreditsData | null> {
   let data: CreditsData | null = null;
 
   try {
@@ -181,13 +170,82 @@ export async function getCreditsData(): Promise<CreditsData> {
   }
 
   if (!data) {
-    // Première installation ou données locales perdues : vérifier le droit au bonus côté serveur.
-    const bonusAmount = await determineInitialBonus();
-    data = createWalletData(bonusAmount);
-    await saveCreditsData(data);
+    return null;
   }
 
   return data;
+}
+
+async function loadCreditsData(): Promise<CreditsData> {
+  let data = await readStoredCreditsData();
+
+  if (!data) {
+    // Create the local wallet first; the server decides whether this device is eligible.
+    data = createWalletData(0);
+    await saveCreditsData(data);
+  }
+
+  if (
+    data.welcomeBonusClaimSynced !== true &&
+    Date.now() - lastWelcomeBonusSyncAttemptAt >= WELCOME_BONUS_SYNC_RETRY_MS
+  ) {
+    lastWelcomeBonusSyncAttemptAt = Date.now();
+    try {
+      const deviceId = await getOrCreateDeviceId();
+      const { newlyGranted } = await claimCreditsBonus({ deviceId });
+      const alreadyHasWelcomeBonus =
+        data.wallet.initialBonusGranted ||
+        data.transactions.some((transaction) => transaction.type === 'bonus_initial');
+
+      // Reconcile older wallets too, while avoiding a second local credit if the
+      // welcome bonus is already present in their transaction history.
+      if (newlyGranted && !alreadyHasWelcomeBonus) {
+        const bonusAmount = Math.min(
+          INITIAL_BONUS,
+          Math.max(0, MAX_BALANCE - data.wallet.balance),
+        );
+        if (bonusAmount > 0) {
+          const now = Date.now();
+          const newBalance = data.wallet.balance + bonusAmount;
+          data.wallet.balance = newBalance;
+          data.wallet.initialBonusGranted = true;
+          data.transactions = [
+            {
+              id: `tx_${now}_bonus`,
+              timestamp: now,
+              type: 'bonus_initial' as const,
+              creditsDelta: bonusAmount,
+              balanceAfter: newBalance,
+              description: 'Bonus de bienvenue de 150 crédits',
+            },
+            ...data.transactions,
+          ].slice(0, MAX_TRANSACTIONS);
+        }
+      }
+
+      data.welcomeBonusClaimSynced = true;
+      await saveCreditsData(data);
+    } catch (err) {
+      // Do not mint credits offline; retry the server's idempotent claim later.
+      console.warn('Welcome bonus claim failed; will retry when the server is reachable', err);
+    }
+  }
+
+  return data;
+}
+
+export async function getCreditsData(): Promise<CreditsData> {
+  if (creditsDataLoadPromise) return creditsDataLoadPromise;
+
+  const loading = loadCreditsData();
+  creditsDataLoadPromise = loading;
+  try {
+    return await loading;
+  } finally {
+    if (creditsDataLoadPromise === loading) {
+      creditsDataLoadPromise = null;
+    }
+  }
 }
 
 export async function saveCreditsData(data: CreditsData): Promise<void> {

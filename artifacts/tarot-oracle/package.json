@@ -60,6 +60,7 @@
     "zod-validation-error": "^3.4.0"
   },
   "dependencies": {
+    "expo-application": "~57.0.3",
     "expo-asset": "~57.0.18",
     "expo-audio": "~57.0.5",
     "expo-file-system": "~57.0.7",
