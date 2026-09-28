@@ -1,0 +1,61 @@
+name: Build Tarot Oracle APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_domain:
+        description: Public API hostname, without https://
+        required: true
+        type: string
+        default: simple-oracle--maison558azerty.replit.app
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      EXPO_PUBLIC_DOMAIN: ${{ inputs.api_domain || vars.EXPO_PUBLIC_DOMAIN || 'simple-oracle--maison558azerty.replit.app' }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Android project
+        run: pnpm --filter @workspace/tarot-oracle exec expo prebuild --platform android --no-install
+
+      - name: Build installable debug APK
+        working-directory: artifacts/tarot-oracle/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: tarot-oracle-apk
+          path: artifacts/tarot-oracle/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
