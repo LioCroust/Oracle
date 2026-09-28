@@ -60,22 +60,19 @@ export async function getOrCreateDeviceId(): Promise<string> {
   // Android ID survives app-data removal and reinstall for the same app
   // signing identity and Android user, unlike values stored in the app sandbox.
   if (Platform.OS === 'android') {
-    try {
-      const androidId = Application.getAndroidId();
-      if (androidId) {
-        deviceId = `android_${androidId}`;
-      }
-    } catch {
-      // Fall back to the locally persisted ID if the platform ID is unavailable.
+    const androidId = Application.getAndroidId();
+    if (!androidId) {
+      throw new Error(
+        'Android ID is unavailable; refusing to use a reinstall-unstable bonus identity',
+      );
     }
+    return `android_${androidId}`;
   }
 
-  if (!deviceId) {
-    try {
-      deviceId = await SecureStore.getItemAsync(DEVICE_ID_KEY);
-    } catch {
-      // SecureStore may fail on some platforms; fall through to backup.
-    }
+  try {
+    deviceId = await SecureStore.getItemAsync(DEVICE_ID_KEY);
+  } catch {
+    // SecureStore may fail on some platforms; fall through to backup.
   }
 
   if (!deviceId) {
