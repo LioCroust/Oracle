@@ -1,0 +1,23 @@
+kind = "mobile"
+previewPath = "/"
+title = "Tarot Oracle"
+version = "1.0.0"
+id = "artifacts/tarot-oracle"
+router = "expo-domain"
+
+[[services]]
+name = "expo"
+ensurePreviewReachable = "/status"
+paths = [ "/" ]
+localPort = 22940
+
+[services.development]
+run = "pnpm --filter @workspace/tarot-oracle run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/tarot-oracle", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/tarot-oracle", "run", "serve" ]
+
+[services.env]
+PORT = "22940"
+BASE_PATH = "/"

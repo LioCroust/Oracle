@@ -1,3 +1,3 @@
 # Tarot Oracle
 
-Expo mobile application and API workspace. Run the Build Tarot Oracle APK workflow in GitHub Actions to produce an installable debug APK.
+Tarot Oracle is an Expo SDK 57 mobile app backed by the workspace API server.

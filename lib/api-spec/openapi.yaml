@@ -1,0 +1,709 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: tarot
+    description: Tarot oracle reading operations
+  - name: credits
+    description: Credits and bonus entitlement operations
+  - name: stats
+    description: Usage statistics and admin dashboard data
+  - name: admin
+    description: Admin authentication
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /tarot/reading:
+    post:
+      operationId: createTarotReading
+      tags: [tarot]
+      summary: Generate a short tarot reading
+      description: Draws 3 cards and generates a short AI interpretation only. Use /tarot/reading/detail to generate the detailed reading on demand.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TarotReadingRequest"
+      responses:
+        "200":
+          description: Short tarot reading generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TarotShortReadingResponse"
+        "400":
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Gemini quota exhausted or rate limited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to generate reading
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /tarot/reading/detail:
+    post:
+      operationId: createTarotReadingDetail
+      tags: [tarot]
+      summary: Generate the detailed tarot reading
+      description: Generates the detailed long reading, advice and next steps on demand. Call only after the user has unlocked the full reading.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TarotReadingRequest"
+      responses:
+        "200":
+          description: Detailed tarot reading generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TarotDetailReadingResponse"
+        "400":
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Gemini quota exhausted or rate limited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to generate reading
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /tarot/reading/follow-up-questions:
+    post:
+      operationId: createTarotFollowUpQuestions
+      tags: [tarot]
+      summary: Generate AI-suggested follow-up questions
+      description: Returns three follow-up questions that naturally extend the previous reading for the same cards and question.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TarotFollowUpQuestionsRequest"
+      responses:
+        "200":
+          description: Follow-up questions generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TarotFollowUpQuestionsResponse"
+        "400":
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Gemini quota exhausted or rate limited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to generate questions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /tarot/reading/follow-up-detail:
+    post:
+      operationId: createTarotFollowUpDetail
+      tags: [tarot]
+      summary: Generate a detailed reading for a follow-up question
+      description: Generates a detailed long reading, advice and next steps for a follow-up question, using the same cards and previous reading context.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TarotFollowUpDetailRequest"
+      responses:
+        "200":
+          description: Follow-up detailed reading generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TarotFollowUpDetailResponse"
+        "400":
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Gemini quota exhausted or rate limited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to generate reading
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /credits/claim-bonus:
+    post:
+      operationId: claimCreditsBonus
+      tags: [credits]
+      summary: Atomically claim the initial bonus for a device
+      description: Claims the one-time welcome bonus for a device. Returns whether the bonus was newly granted. If the device already claimed the bonus, newlyGranted is false.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckBonusRequest"
+      responses:
+        "200":
+          description: Bonus claim result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BonusClaimResponse"
+        "400":
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to claim bonus
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /admin/login:
+    post:
+      operationId: adminLogin
+      tags: [admin]
+      summary: Authenticate as admin
+      description: Verifies the admin password and returns a short-lived bearer token used for admin-only stats endpoints.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminLoginRequest"
+      responses:
+        "200":
+          description: Admin token issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminLoginResponse"
+        "400":
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid admin password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to issue token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /stats/events:
+    post:
+      operationId: recordUsageEvent
+      tags: [stats]
+      summary: Record a usage event
+      description: Records one tarot reading usage event (date, response type, question, credits used, generation time) in the persistent database.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UsageEventRequest"
+      responses:
+        "201":
+          description: Usage event recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageEventResponse"
+        "400":
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to record usage event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /stats:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Get usage statistics and history
+      description: Returns aggregated statistics for today, this week, and all time, plus the chronological event history for the admin dashboard.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Statistics and history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsAndHistoryResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to fetch stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: clearStats
+      tags: [stats]
+      summary: Clear all usage statistics
+      description: Deletes all recorded usage events from the database.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Statistics cleared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClearStatsResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to clear stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Admin bearer token obtained from POST /admin/login
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    TarotCard:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the tarot card
+        theme:
+          type: string
+          description: Core theme of the card
+        upright:
+          type: string
+          description: Upright interpretation
+        reversed:
+          type: string
+          description: Reversed interpretation
+        position:
+          type: string
+          description: Position in the spread (e.g. Passé, Présent, Avenir)
+        isReversed:
+          type: boolean
+          description: Whether the card is reversed
+      required:
+        - name
+        - theme
+        - upright
+        - reversed
+        - position
+        - isReversed
+    TarotReadingRequest:
+      type: object
+      properties:
+        question:
+          type: string
+          description: The user's question
+        cards:
+          type: array
+          items:
+            $ref: "#/components/schemas/TarotCard"
+          minItems: 3
+          maxItems: 3
+      required:
+        - question
+        - cards
+    TarotShortReadingResponse:
+      type: object
+      properties:
+        shortReading:
+          type: string
+          description: Concise 60-90 word interpretation in plain language
+        creditsUsed:
+          type: integer
+          description: Credits consumed by this request
+          minimum: 0
+        generationTimeMs:
+          type: integer
+          description: Time spent generating the AI response in milliseconds
+          minimum: 0
+      required:
+        - shortReading
+        - creditsUsed
+        - generationTimeMs
+    TarotDetailReadingResponse:
+      type: object
+      properties:
+        longReading:
+          type: string
+          description: Detailed ~200 word interpretation explaining each card
+        advice:
+          type: string
+          description: Brief guidance from the reading
+        nextSteps:
+          type: string
+          description: Short "what to do now" action
+        creditsUsed:
+          type: integer
+          description: Credits consumed by this request
+          minimum: 0
+        generationTimeMs:
+          type: integer
+          description: Time spent generating the AI response in milliseconds
+          minimum: 0
+      required:
+        - longReading
+        - advice
+        - nextSteps
+        - creditsUsed
+        - generationTimeMs
+    TarotReadingContext:
+      type: object
+      properties:
+        shortReading:
+          type: string
+          description: The previously generated short reading
+        longReading:
+          type: string
+          description: The previously generated detailed reading
+        advice:
+          type: string
+          description: The previously generated advice
+        nextSteps:
+          type: string
+          description: The previously generated next steps
+      required:
+        - shortReading
+        - longReading
+        - advice
+        - nextSteps
+    TarotFollowUpQuestionsRequest:
+      type: object
+      properties:
+        question:
+          type: string
+          description: The user's original question
+        cards:
+          type: array
+          items:
+            $ref: "#/components/schemas/TarotCard"
+          minItems: 3
+          maxItems: 3
+        context:
+          $ref: "#/components/schemas/TarotReadingContext"
+      required:
+        - question
+        - cards
+        - context
+    TarotFollowUpQuestionsResponse:
+      type: object
+      properties:
+        questions:
+          type: array
+          items:
+            type: string
+          minItems: 3
+          maxItems: 3
+          description: Three follow-up questions suggested by the AI
+        creditsUsed:
+          type: integer
+          description: Credits consumed by this request
+          minimum: 0
+        generationTimeMs:
+          type: integer
+          description: Time spent generating the AI response in milliseconds
+          minimum: 0
+      required:
+        - questions
+        - creditsUsed
+        - generationTimeMs
+    TarotFollowUpDetailRequest:
+      type: object
+      properties:
+        question:
+          type: string
+          description: The user's original question
+        cards:
+          type: array
+          items:
+            $ref: "#/components/schemas/TarotCard"
+          minItems: 3
+          maxItems: 3
+        context:
+          $ref: "#/components/schemas/TarotReadingContext"
+        followUpQuestion:
+          type: string
+          description: The follow-up question to answer
+        isSuggested:
+          type: boolean
+          description: Whether the follow-up question is one of the AI-suggested questions (lower cost)
+          default: false
+      required:
+        - question
+        - cards
+        - context
+        - followUpQuestion
+        - isSuggested
+    TarotFollowUpDetailResponse:
+      type: object
+      properties:
+        longReading:
+          type: string
+          description: Detailed ~200 word interpretation answering the follow-up question
+        advice:
+          type: string
+          description: Brief guidance from the follow-up reading
+        nextSteps:
+          type: string
+          description: Short "what to do now" action
+        creditsUsed:
+          type: integer
+          description: Credits consumed by this request
+          minimum: 0
+        generationTimeMs:
+          type: integer
+          description: Time spent generating the AI response in milliseconds
+          minimum: 0
+      required:
+        - longReading
+        - advice
+        - nextSteps
+        - creditsUsed
+        - generationTimeMs
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+    CheckBonusRequest:
+      type: object
+      properties:
+        deviceId:
+          type: string
+          maxLength: 128
+          description: Stable device identifier used to track bonus entitlement
+      required:
+        - deviceId
+    BonusClaimResponse:
+      type: object
+      properties:
+        granted:
+          type: boolean
+          description: Whether the bonus entitlement is recorded for this device
+        newlyGranted:
+          type: boolean
+          description: Whether the bonus was newly granted by this call (true) or already claimed previously (false)
+      required:
+        - granted
+        - newlyGranted
+    UsageEventRequest:
+      type: object
+      properties:
+        responseType:
+          type: string
+          enum: [short, detail, follow_up_questions, follow_up_detail]
+          description: Type of response generated
+        question:
+          type: string
+          maxLength: 2000
+          description: The user's question
+        creditsUsed:
+          type: integer
+          minimum: 0
+          description: Credits consumed by this response
+        generationTimeMs:
+          type: integer
+          minimum: 0
+          description: Time spent generating the AI response in milliseconds
+      required:
+        - responseType
+        - question
+        - creditsUsed
+        - generationTimeMs
+    UsageEventResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the event
+        date:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when the event was recorded
+        responseType:
+          type: string
+          enum: [short, detail, follow_up_questions, follow_up_detail]
+          description: Type of response generated
+        question:
+          type: string
+          description: The user's question
+        creditsUsed:
+          type: integer
+          description: Credits consumed by this response
+        generationTimeMs:
+          type: integer
+          description: Time spent generating the AI response in milliseconds
+      required:
+        - id
+        - date
+        - responseType
+        - question
+        - creditsUsed
+        - generationTimeMs
+    UsageStatsBucket:
+      type: object
+      properties:
+        shortReadings:
+          type: integer
+          description: Number of short readings in this bucket
+        detailReadings:
+          type: integer
+          description: Number of detailed readings in this bucket
+        totalDraws:
+          type: integer
+          description: Total number of readings in this bucket
+        creditsUsed:
+          type: integer
+          description: Total credits consumed in this bucket
+        avgGenerationTimeMs:
+          type: integer
+          description: Average generation time in milliseconds in this bucket
+      required:
+        - shortReadings
+        - detailReadings
+        - totalDraws
+        - creditsUsed
+        - avgGenerationTimeMs
+    StatsResponse:
+      type: object
+      properties:
+        today:
+          $ref: "#/components/schemas/UsageStatsBucket"
+        thisWeek:
+          $ref: "#/components/schemas/UsageStatsBucket"
+        allTime:
+          $ref: "#/components/schemas/UsageStatsBucket"
+        totalEvents:
+          type: integer
+          description: Total number of recorded events
+      required:
+        - today
+        - thisWeek
+        - allTime
+        - totalEvents
+    StatsAndHistoryResponse:
+      type: object
+      properties:
+        stats:
+          $ref: "#/components/schemas/StatsResponse"
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/UsageEventResponse"
+          description: Chronological event history, newest first
+      required:
+        - stats
+        - history
+    ClearStatsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Whether the stats were cleared successfully
+      required:
+        - success
+    AdminLoginRequest:
+      type: object
+      properties:
+        password:
+          type: string
+          description: Admin password
+      required:
+        - password
+    AdminLoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Bearer token to use on admin stats endpoints
+      required:
+        - token
